@@ -4,8 +4,8 @@
 
 
 var fs = require('fs');
-var mime = require('mime');
 var multer = require('multer');
+var path = require('path');
 
 
 // -----
@@ -16,6 +16,24 @@ var multer = require('multer');
 
 
 var Product = require('../models/product');
+var productUpload = multer({
+    storage: multer.memoryStorage()
+}).single('product_image');
+
+function findStaticProductImage(productId) {
+    var productDir = path.join(__dirname, '..', 'www', 'catalog', 'product');
+    var extensions = ['jpeg', 'jpg', 'png', 'webp'];
+
+    for (var i = 0; i < extensions.length; i++) {
+        var imagePath = path.join(productDir, productId + '.' + extensions[i]);
+
+        if (fs.existsSync(imagePath)) {
+            return imagePath;
+        }
+    }
+
+    return null;
+}
 
 // Display list of all Products.
 exports.product_list = function (req, res) {
@@ -23,7 +41,9 @@ exports.product_list = function (req, res) {
         //.populate('categories')
         .exec(function (err, list_products) {
             if (err) {
-                throw err;
+                return res.render('shop', {
+                    products: []
+                });
             }
             //Successful, so render
             res.render('shop', {
@@ -38,7 +58,9 @@ exports.product_edit = function (req, res) {
         //.populate('categories')
         .exec(function (err, list_products) {
             if (err) {
-                throw err;
+                return res.render('edit-products', {
+                    products: []
+                });
             }
             //Successful, so render
             res.render('edit-products', {
@@ -54,7 +76,12 @@ exports.product_detail = function (req, res) {
         //.populate('categories')
         .exec(function (err, product) {
             if (err) {
-                throw err;
+                return res.status(500).send(err);
+            }
+            if (!product) {
+                return res.status(404).send({
+                    error: 'Product not found'
+                });
             }
             //Successful, so render
             //console.log(product)
@@ -70,48 +97,31 @@ exports.product_create_post = function (req, res) {
     // Create a Book object with escaped and trimmed data.
     var product = new Product({});
 
-
-    var storage = multer.diskStorage({
-        destination: './uploads',
-        filename: function (req, file, cb) {
-            cb(null, product._id + '.' + mime.getExtension(file.mimetype));
-        }
-    });
-
-    var upload = multer({
-        storage: storage
-    }).any();
-
-
-    upload(req, res, function (err) {
+    productUpload(req, res, function (err) {
         if (err) {
-            throw err;
+            return res.status(500).send(err);
             //return res.end('Error uploading file.');
         } else {
             //console.log(req.body);
-            //console.log(req.files);
+            //console.log(req.file);
 
 
             product.name = req.body.product_name;
             product.description = req.body.product_description;
             product.cost = req.body.product_cost;
 
-            product.image.data = fs.readFileSync(req.files[0].path);
-            product.image.contentType = req.files[0].mimetype;
+            if (req.file) {
+                product.image.data = req.file.buffer;
+                product.image.contentType = req.file.mimetype;
+            }
             //console.log(product);
 
             product.save(function (err) {
                 if (err) {
-                    throw err;
+                    return res.status(500).send(err);
                 }
                 //successful - redirect to new book record.
                 res.redirect('/dashboard/products');
-
-                fs.unlink(req.files[0].path, function (err) {
-                    if (err) {
-                        throw err;
-                    }
-                });
             });
 
             //res.end("File has been uploaded");
@@ -131,7 +141,7 @@ exports.product_create_post = function (req, res) {
 exports.product_delete_post = function (req, res) {
     Product.findByIdAndRemove(req.params.id, function (err) {
         if (err) {
-            throw err;
+            return res.status(500).send(err);
         }
         // Success - go to author list
         res.redirect('/dashboard/products');
@@ -143,36 +153,27 @@ exports.product_delete_post = function (req, res) {
 
 // Handle Product update on POST.
 exports.product_update_post = function (req, res) {
-    var product = new Product();
-
-
-    var storage = multer.diskStorage({
-        destination: './www/catalog/product',
-        filename: function (req, file, cb) {
-
-            cb(null, req.params.id + '.' + mime.getExtension(file.mimetype));
-        }
-    });
-
-    var upload = multer({
-        storage: storage
-    }).any();
-
-    upload(req, res, function (err) {
+    productUpload(req, res, function (err) {
         if (err) {
-            throw err;
+            return res.status(500).send(err);
         } else {
 
-            product.name = req.body.product_name;
-            product.description = req.body.product_description;
-            product.cost = req.body.product_cost;
-            product._id = req.params.id;
-            product.imagetype = mime.getExtension(req.files[0].mimetype);
+            var product = {
+                name: req.body.product_name,
+                description: req.body.product_description,
+                cost: req.body.product_cost
+            };
 
+            if (req.file) {
+                product.image = {
+                    data: req.file.buffer,
+                    contentType: req.file.mimetype
+                };
+            }
 
             Product.findByIdAndUpdate(req.params.id, product, {}, function (err) {
                 if (err) {
-                    throw err;
+                    return res.status(500).send(err);
                 }
                 //successful - redirect to new book record.
                 res.redirect('/dashboard/products');
@@ -191,10 +192,20 @@ exports.product_image_get = function (req, res) {
     Product.findById(req.params.id)
         .exec(function (err, product) {
             if (err) {
-                throw err;
+                return res.redirect('/images/blank.png');
             }
 
-            res.contentType(product.image.contentType);
+            if (!product || !product.image || !product.image.data || product.image.data.length === 0) {
+                var staticImagePath = findStaticProductImage(req.params.id);
+
+                if (staticImagePath) {
+                    return res.sendFile(staticImagePath);
+                }
+
+                return res.redirect('/images/blank.png');
+            }
+
+            res.contentType(product.image.contentType || 'image/png');
             res.send(product.image.data);
 
             //res.send(list_products);

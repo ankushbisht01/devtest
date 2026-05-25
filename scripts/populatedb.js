@@ -4,12 +4,15 @@ console.log('This script populates some test projects, products, productCategory
 
 // Get arguments passed on command line
 var userArgs = process.argv.slice(2);
-if (!userArgs[0].startsWith('mongodb://')) {
+if (!userArgs[0] || (!userArgs[0].startsWith('mongodb://') && !userArgs[0].startsWith('mongodb+srv://'))) {
     console.log('ERROR: You need to specify a valid mongodb URL as the first argument');
     return
 }
 
 var async = require('async')
+var fs = require('fs')
+var path = require('path')
+var mime = require('mime')
 
 var Product = require('../models/product')
 var Project = require('../models/project')
@@ -19,7 +22,7 @@ var Enquiry = require('../models/enquiry')
 
 var mongoose = require("mongoose");
 var mongoDB = userArgs[0];
-mongoose.connect(mongoDB);
+mongoose.connect(mongoDB, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = global.Promise;
 var db = mongoose.connection;
 mongoose.connection.on('error', console.error.bind(console, 'MongoDB connection error:'));
@@ -29,7 +32,28 @@ var productCategories = []
 var projects = []
 var enquiries = []
 
-function productCreate(name, description, cost, status, categories, cb) {
+function catalogFilePath(folder, filename) {
+    return path.join(__dirname, '..', 'www', 'catalog', folder, filename)
+}
+
+function catalogUrl(folder, filename) {
+    return '/catalog/' + folder + '/' + filename
+}
+
+function catalogImageData(folder, filename) {
+    if (!filename) return null
+
+    var imagePath = catalogFilePath(folder, filename)
+
+    if (!fs.existsSync(imagePath)) return null
+
+    return {
+        data: fs.readFileSync(imagePath),
+        contentType: mime.getType(imagePath) || 'image/jpeg'
+    }
+}
+
+function productCreate(name, description, cost, status, categories, imageFile, cb) {
     productdetail = {
         name: name,
         description: description,
@@ -38,6 +62,11 @@ function productCreate(name, description, cost, status, categories, cb) {
         categories: categories
     }
 
+    var image = catalogImageData('product', imageFile)
+
+    if (image) {
+        productdetail.image = image
+    }
 
     var product = new Product(productdetail);
 
@@ -68,15 +97,18 @@ function productCategoryCreate(name, cb) {
     });
 }
 
-function projectCreate(name, owner, description, date, cost, url, categories, cb) {
+function projectCreate(name, owner, description, date, cost, url, categories, images, cb) {
     projectdetail = {
         name: name,
         owner: owner,
         description: description,
         date: date,
         cost: cost,
-        url: url,
-        categories: categories
+        projectUrl: url,
+        categories: categories,
+        images: (images || []).map(function(filename) {
+            return catalogUrl('project', filename)
+        })
     }
 
     var project = new Project(projectdetail);
@@ -134,18 +166,18 @@ function createProductCategory(cb) {
 function createProduct(cb) {
     async.parallel([
         function (callback) {
-                productCreate("woodlamp", "wooden lamp description", 300, true, [productCategories[2], productCategories[1],], callback);
+                productCreate("woodlamp", "wooden lamp description", 300, true, [productCategories[2], productCategories[1],], "5afc24f9f7eae61bffc3cf7d.jpeg", callback);
         },
         function (callback) {
-                productCreate("woodchair", "wooden chair description", 300, true, [productCategories[2], productCategories[0],], callback);
+                productCreate("woodchair", "wooden chair description", 300, true, [productCategories[2], productCategories[0],], "5b166d03ea046d066fb2d57c.jpeg", callback);
 
         },
         function (callback) {
-                productCreate("lamp", "lamp description", 300, true, [productCategories[1], ], callback);
+                productCreate("lamp", "lamp description", 300, true, [productCategories[1], ], "5afc24f9f7eae61bffc3cf80.jpeg", callback);
 
         },
         function (callback) {
-                productCreate("chair", "chair description", 300, true, [productCategories[0], ], callback);
+                productCreate("chair", "chair description", 300, true, [productCategories[0], ], "5b1687cd7663d031ab5868bb.jpeg", callback);
 
         },
         ],
@@ -157,19 +189,19 @@ function createProduct(cb) {
 function createprojects(cb) {
     async.parallel([
         function (callback) {
-                projectCreate("project 1", "owner 1", "description for 1", "1998-07-27", 234000, "http://google.com", ["commercial", "office"], callback);
+                projectCreate("project 1", "owner 1", "description for 1", "1998-07-27", 234000, "http://google.com", ["commercial", "office"], ["5afc24fbf7eae61bffc3cf83.jpeg"], callback);
         },
         function (callback) {
-                projectCreate("project 2", "owner 2", "description for 2", "1968-07-27", 234000, "http://google.com", ["commercial", "shop"], callback);
+                projectCreate("project 2", "owner 2", "description for 2", "1968-07-27", 234000, "http://google.com", ["commercial", "shop"], ["5b1a2ca9d54e3e26c8631617.jpeg"], callback);
         },
         function (callback) {
-                projectCreate("project 3", "owner 2", "description for 3", "1998-05-27", 234000, "http://google.com", ["residential", "bunglow"], callback);
+                projectCreate("project 3", "owner 2", "description for 3", "1998-05-27", 234000, "http://google.com", ["residential", "bunglow"], ["5b1a2ce0fb941626fabe5df8.jpeg"], callback);
         },
         function (callback) {
-                projectCreate("project 4", "owner 3", "description for 4", "1999-07-29", 234000, "http://google.com", ["residential", "farmhouse"], callback);
+                projectCreate("project 4", "owner 3", "description for 4", "1999-07-29", 234000, "http://google.com", ["residential", "farmhouse"], ["5b1e9e4229b4652d91a7cd78.png"], callback);
         },
         function (callback) {
-                projectCreate("project 5", "owner 4", "description for 5", "1990-07-24", 234000, "http://google.com", ["residential", "apartment"], callback);
+                projectCreate("project 5", "owner 4", "description for 5", "1990-07-24", 234000, "http://google.com", ["residential", "apartment"], ["5b1e9fe9912168318f98c206.jpeg"], callback);
         }
         ],
         // optional callback

@@ -1,8 +1,6 @@
 var Enquiry = require('../models/enquiry')
 var Product = require('../models/product')
-
-const sgMail = require('@sendgrid/mail')
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+var mailer = require('../utils/dummyMailer')
 
 // Display list of all Enquirys.
 exports.enquiry_list = function(req, res) {
@@ -12,7 +10,9 @@ exports.enquiry_list = function(req, res) {
 		}
 	}).exec(function(err, list_all) {
 		if (err) {
-			throw err
+			return res.render('dashboard', {
+				enquiries: []
+			})
 		}
 		//Successful, so render
 		res.render('dashboard', {
@@ -37,7 +37,9 @@ exports.dashboard_list = function(req, res) {
 		}
 	).exec(function(err, list_unread) {
 		if (err) {
-			throw err
+			return res.render('dashboard', {
+				enquiries: []
+			})
 		}
 		//Successful, so render
 		res.render('dashboard', {
@@ -51,7 +53,12 @@ exports.dashboard_list = function(req, res) {
 exports.enquiry_detail = function(req, res) {
 	Enquiry.findById(req.params.id).exec(function(err, enquiry) {
 		if (err) {
-			throw err
+			return res.status(500).send(err)
+		}
+		if (!enquiry) {
+			return res.status(404).send({
+				error: 'Enquiry not found'
+			})
 		}
 		//Successful, so render
 		//console.log(product)
@@ -60,7 +67,7 @@ exports.enquiry_detail = function(req, res) {
 		enquiry.status = false
 		Enquiry.findByIdAndUpdate(req.params.id, enquiry, {}, function(err) {
 			if (err) {
-				throw err
+				return
 			}
 			//Successful, so render
 			//console.log(product)
@@ -74,6 +81,10 @@ exports.enquiry_detail = function(req, res) {
 // Handle Enquiry create on POST.
 exports.enquiry_create_post = function(req, res) {
 	Product.findById(req.body.productid).exec(function(err, pro) {
+		if (err) {
+			return res.status(500).send(err)
+		}
+
 		var enquiry = new Enquiry({
 			name: req.body.name,
 			comment: req.body.comment,
@@ -81,7 +92,7 @@ exports.enquiry_create_post = function(req, res) {
 			phone: req.body.phone
 		})
 
-		if (enquiry.comment == 'nothing') {
+		if (enquiry.comment == 'nothing' && pro) {
 			enquiry.comment = 'About: ' + pro.name
 		}
 
@@ -96,14 +107,14 @@ exports.enquiry_create_post = function(req, res) {
                         <br>Phone: ${enquiry.phone} </p>`
         }
 
-        sgMail.send(email).catch(console.error)
+        mailer.send(email)
 
 		enquiry.save(function(err) {
 			if (err) {
-				throw err
+				return res.status(500).send(err)
 			}
 			//successful - redirect to new book record.
-			res.send(pro)
+			res.send(pro || enquiry)
 
 			
 		})
@@ -135,12 +146,12 @@ exports.enquiry_contact_create_post = function(req, res) {
                     <br>Phone: ${enquiry.phone} </p>`
     }
 
-    sgMail.send(email).catch(console.error)
+    mailer.send(email)
 	//res.send('NOT IMPLEMENTED: Enquiry create POST');
 
 	enquiry.save(function(err) {
 		if (err) {
-			throw err
+			return res.status(500).send(err)
 		}
 
 		res.render('contact', {
@@ -153,50 +164,9 @@ exports.enquiry_contact_create_post = function(req, res) {
 exports.enquiry_delete_get = function(req, res) {
 	Enquiry.findByIdAndRemove(req.params.id, function(err) {
 		if (err) {
-			throw err
+			return res.status(500).send(err)
 		}
 		// Success - go to author list
 		res.send(true)
 	})
 }
-
-/* // Email ---
-const sgMail = require('@sendgrid/mail')
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-
-		let email = {
-			// to: ['dayshmookh_krushn.ghrcecs@raisoni.net'],
-			to: machine.supplier.email.split(';'),
-			from: 'Krushn Dayshmookh <notifications@ofajassistant.com>', // 
-			subject: `B.Q. for calibration of ${machine.name} from OFAJ`,
-			html: `<p>Kindly give B.Q. for calibration of ${machine.name}. \
-				   	<br>Thanking you! \
-					<br>With regards, \
-					<br>${machine.incharge.name} \
-					<br>${inchagephone}
-					<br>M.M. OFAJ Nagpur<p>`
-		}
-
-
-	console.log('Sending email...')
-
-	sgMail
-		.send(email)
-		.then(result => {
-			//Celebrate
-			console.log('Sent mail.')
-			
-		})
-		.catch(error => {
-			//Log friendly error
-			console.error(error.toString())
-
-			//Extract error msg
-			// const { message, code, response } = error
-
-			//Extract response msg
-			// const { headers, body } = response
-		})
-
-	
- */

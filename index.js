@@ -1,5 +1,7 @@
 /* eslint-env node */
 
+require('dotenv').config()
+
 // ----- Initialize Express -----
 
 var express = require('express')
@@ -8,25 +10,32 @@ var app = express()
 // ----- Configuration -----
 
 var port = process.env.PORT || 3000
+var host = process.env.HOST || '127.0.0.1'
 
-var dbport = process.env.MONGODB_URI 
-
+var dbport = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/website-sparc'
+console.log('Using MongoDB URI:', dbport)
 var routes = require('./routes.js')
 
 // ----- Middleware -----
 
 //Import the mongoose module
 var mongoose = require('mongoose')
+mongoose.set('useFindAndModify', false)
 
 //Set up default mongoose connection
-mongoose.connect(dbport, { useNewUrlParser: true })
+mongoose.connect(dbport, { useNewUrlParser: true, useUnifiedTopology: true })
 // Get Mongoose to use the global promise library
 mongoose.Promise = global.Promise
 //Get the default connection
 var db = mongoose.connection
 
 //Bind connection to error event (to get notification of connection errors)
-db.on('error', console.error.bind(console, 'MongoDB connection error:'))
+db.on('error', function(err) {
+	console.error('MongoDB connection error:', err.message)
+})
+db.once('open', function() {
+	console.log('Connected to MongoDB')
+})
 
 // -----
 
@@ -92,9 +101,15 @@ app.use(function(req, res) {
 
 // ----- Start listening -----
 
-app.listen(port, function(err) {
+var server = app.listen(port, host, function(err) {
 	if (err) {
-		throw err
+		console.error('Unable to start server:', err.message)
+		process.exit(1)
 	}
-	console.log('App listening on port ' + port)
+	console.log('App listening at http://' + host + ':' + port)
+})
+
+server.on('error', function(err) {
+	console.error('Unable to start server:', err.message)
+	process.exit(1)
 })

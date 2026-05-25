@@ -25,11 +25,12 @@ html(lang='en')
                 .gallery.row
 
                     each project in projects
+                        - var projectCover = project.images && project.images.length ? project.images[0] : '/images/blank.png'
                         .col.l4.m6.s12.gallery-item.gallery-expand(style="position: absolute; left: 0px; top: 0px;")
                             .placeholder
                                 .gallery-curve-wrapper
                                     a.gallery-cover.gray
-                                        img.responsive-img(src=project.images[0], alt='project')
+                                        img.responsive-img(src=projectCover, alt='project')
                                     .gallery-header
                                         span #{project.name}
                                     .gallery-body
@@ -45,15 +46,16 @@ html(lang='en')
 
                                         
 
-                                        .carousel-wrapper
-                                            .carousel
-                                                //- a.carousel-item(href='#one!')	
-                                                each image in project.images
-                                                    a.carousel-item(href=image, target="_blank")
-                                                        img.bordered-sassy(src=image)
+                                        if project.images && project.images.length
+                                            .carousel-wrapper
+                                                .carousel
+                                                    each image in project.images
+                                                        a.carousel-item(href=image, target="_blank")
+                                                            img.bordered-sassy(src=image)
 
-                                        .section.center
-                                            iframe.full-width(height="400px" src=project.youtubeUrl+"&origin=http://www.sparcassociates.com/" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen)
+                                        if project.youtubeUrl
+                                            .section.center
+                                                iframe.full-width(height="400px" src=project.youtubeUrl+"&origin=http://www.sparcassociates.com/" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen)
 
 
                                     .gallery-action

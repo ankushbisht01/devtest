@@ -161,18 +161,27 @@ function clearproject() {
 	$('#delete-btn').attr('href', '!#')
 }
 
-const uploadFile = function(file, signedRequest, url) {
+const uploadFile = function(file) {
 	// showWait()
 	// currentVue = this
 
-	fetch(signedRequest, {
-		method: 'PUT',
-		mode: 'cors',
-		body: file
+	let formData = new FormData()
+	formData.append('project_image', file)
+
+	fetch('/api/project/image/upload', {
+		method: 'POST',
+		body: formData
 	})
 		.then(function(response) {
-			// projectsVue.selectedProject.images.push(file)
-			projectsVue.selectedProject.images.push(url)
+			if (!response.ok) {
+				throw new Error('Image upload failed')
+			}
+
+			return response.json()
+		})
+		.then(function(data) {
+			projectsVue.selectedProject.images.push(data.url)
+			M.toast({ html: 'Image uploaded locally!' })
 		})
 		.catch(function(error) {
 			M.toast({ html: 'Error occured! Check console for details.' })
@@ -183,33 +192,17 @@ const uploadFile = function(file, signedRequest, url) {
 		})
 }
 
-const getSignedRequest = function(file) {
-	// console.log(file)
-
-	fetch(`/api/project/sign-s3/put?fileName=${file.name}&fileType=${file.type}`)
-		.then(function(response) {
-			return response.json()
-		})
-		.then(function(data) {
-			console.log(data)
-			uploadFile(file, data.signedRequest, data.url)
-		})
-		.catch(function(error) {
-			M.toast({ html: 'Error occured! Check console for details.' })
-			console.error(error)
-		})
-}
 const onFileUpload = function() {
 	let file = document.querySelector('#project-image').files[0]
 	// console.log(file)
 	if (file == null) return alert('No file selected.')
-	getSignedRequest(file)
+	uploadFile(file)
 }
 
 function deleteImage(imageURL) {
 	let filename = imageURL.split('/').slice(-1)[0]
 
-	fetch(`/api/project/image/delete?fileName=${filename}`)
+	fetch(`/api/project/image/delete?fileName=${encodeURIComponent(filename)}`)
 		.then(function(response) {
 			return response.json()
 		})

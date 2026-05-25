@@ -30,7 +30,7 @@ html
 
                           
                             a.collection-item.avatar(v-for="project in projects" @click='javascript:populate(project._id)')
-                                img.circle(:src="project.images[0]", :alt="project.name")
+                                img.circle(:src="project.images && project.images.length ? project.images[0] : '/images/blank.png'", :alt="project.name")
                                 
                                 span.title.strong.grey-text.text-darken-2 {{project.name}}
                                 p.black-text.truncate {{project.description}}
@@ -123,4 +123,3 @@ html
         include ./footer.pug
         script(src="/js/vue.js")
         script(src="/js/edit-projects.js")
-

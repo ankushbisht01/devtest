@@ -4,8 +4,8 @@
     "description": "A website for SpArc Architects.",
     "main": "index.js",
     "scripts": {
-        "start": "node index.js",
-        "debug": "nodemon -r dotenv/config index.js",
+        "start": "node --no-warnings index.js",
+        "debug": "nodemon --exec \"node --no-warnings\" index.js",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "repository": {
@@ -23,8 +23,6 @@
     },
     "homepage": "https://github.com/dayshmookh/website-sparc#readme",
     "dependencies": {
-        "@sendgrid/mail": "^7.0.1",
-        "aws-sdk": "^2.658.0",
         "body-parser": "^1.19.0",
         "cors": "^2.8.5",
         "express": "^4.17.1",

@@ -1,52 +1,107 @@
 /* eslint-env node */
 
 const fs = require('fs')
-const mime = require('mime')
+const path = require('path')
 const multer = require('multer')
 
-const aws = require('aws-sdk')
-const S3_BUCKET = process.env.S3_BUCKET
-aws.config.region = process.env.AWS_REGION
-
-const s3 = new aws.S3()
-// -----
-
 var Project = require('../models/project')
+
+const PROJECT_IMAGE_DIR = path.join(__dirname, '..', 'www', 'catalog', 'project')
+const PROJECT_IMAGE_URL_PREFIX = '/catalog/project'
+
+function ensureProjectImageDir() {
+	fs.mkdirSync(PROJECT_IMAGE_DIR, { recursive: true })
+}
+
+function safeFilePart(value) {
+	return path
+		.basename(value || 'project-image')
+		.replace(/[^a-zA-Z0-9_.-]/g, '-')
+}
+
+function localImagePathFromName(fileName) {
+	if (!fileName) return null
+	return path.join(PROJECT_IMAGE_DIR, path.basename(fileName))
+}
+
+function localImagePathFromUrl(imageUrl) {
+	if (typeof imageUrl !== 'string') return null
+	if (imageUrl.indexOf(PROJECT_IMAGE_URL_PREFIX + '/') !== 0) return null
+	return localImagePathFromName(imageUrl.split('/').slice(-1)[0])
+}
+
+function deleteLocalProjectImages(images, done) {
+	if (!images || images.length === 0) return done()
+
+	var pending = images.length
+	var firstError = null
+
+	function finish(err) {
+		if (err && err.code !== 'ENOENT' && !firstError) {
+			firstError = err
+		}
+
+		pending -= 1
+		if (pending === 0) done(firstError)
+	}
+
+	images.forEach(function(imageUrl) {
+		var imagePath = localImagePathFromUrl(imageUrl)
+
+		if (!imagePath) return finish()
+
+		fs.unlink(imagePath, finish)
+	})
+}
+
+const projectImageStorage = multer.diskStorage({
+	destination: function(req, file, cb) {
+		try {
+			ensureProjectImageDir()
+			cb(null, PROJECT_IMAGE_DIR)
+		} catch (err) {
+			cb(err)
+		}
+	},
+	filename: function(req, file, cb) {
+		var originalExt = path.extname(file.originalname)
+		var ext = originalExt.toLowerCase()
+		var baseName = safeFilePart(path.basename(file.originalname, originalExt))
+		var uniquePart = Date.now() + '-' + Math.round(Math.random() * 1e9)
+
+		cb(null, uniquePart + '-' + baseName + ext)
+	}
+})
+
+const projectImageUpload = multer({
+	storage: projectImageStorage
+}).single('project_image')
 
 // Display list of all Projects.
 exports.project_list = function(req, res) {
 	Project.find({}).exec(function(err, list_projects) {
 		if (err) {
-			throw err
+			return res.render('gallery', {
+				projects: []
+			})
 		}
-		//Successful, so render
+
 		res.render('gallery', {
 			projects: list_projects
 		})
-		//res.send(list_projects);
 	})
-	//res.send('NOT IMPLEMENTED: Project list');
 }
 
 exports.project_edit = function(req, res) {
-	// Project.find({})
-	//     .exec(function (err, list_projects) {
-	//         if (err) {
-	//             throw err;
-	//         }
-	//Successful, so render
-	res.render('edit-projects' /* , {
-                projects: list_projects
-            } */)
-	//res.send(list_projects);
-	// });
+	res.render('edit-projects')
 }
 
 exports.project_list_api = function(req, res) {
 	Project.find({}).exec(function(err, list_projects) {
 		if (err) {
-			throw err
+			return res.status(500).send(err)
 		}
+
 		res.send(list_projects)
 	})
 }
@@ -55,216 +110,127 @@ exports.project_list_api = function(req, res) {
 exports.project_detail = function(req, res) {
 	Project.findById(req.params.id).exec(function(err, project) {
 		if (err) {
-			throw err
+			return res.status(500).send(err)
 		}
-		//Successful, so render
-		//console.log(product)
+		if (!project) {
+			return res.status(404).send({
+				error: 'Project not found'
+			})
+		}
+
 		res.send(project)
-		//res.send(list_products);
 	})
 }
 
 // Handle Project create on POST.
 exports.project_create_post = function(req, res) {
-	// Create a Book object with escaped and trimmed data.
 	var project = new Project(req.body)
 
-	// var storage = multer.diskStorage({
-	// 	destination: './uploads',
-	// 	filename: function(req, file, cb) {
-	// 		cb(null, project._id + '.' + mime.getExtension(file.mimetype))
-	// 	}
-	// })
-
-	// var upload = multer({
-	// 	storage: storage
-	// }).any()
-
-	// upload(req, res, function(err) {
-	// 	if (err) {
-	// 		throw err
-	// 		//return res.end('Error uploading file.');
-	// 	} else {
-	// 		//console.log(req.body);
-	// 		//console.log(req.files);
-
-	// 		/* */
-	// 		project.name = req.body.project_name
-	// 		project.owner = req.body.project_owner
-	// 		project.description = req.body.project_description
-	// 		project.date = req.body.project_date
-	// 		project.cost = req.body.project_cost
-	// 		project.url = req.body.project_url
-	// 		project.categories = req.body.project_categories
-
-	// 		project.image.data = fs.readFileSync(req.files[0].path)
-	// 		project.image.contentType = req.files[0].mimetype
-	// 		//console.log(product);
+	if (!project.images) {
+		project.images = []
+	}
 
 	project.save(function(err) {
 		if (err) {
-			throw err
+			return res.status(500).send(err)
 		}
-		//successful - redirect to new book record.
-		// res.redirect('/dashboard/projects')
+
 		res.send(project)
 	})
-	// fs.unlink(req.files[0].path, function(err) {
-	// 	if (err) {
-	// 		throw err
-	// 	}
-	// })
-	// //res.end("File has been uploaded");
-	// /**/
-	// }
-	// })
-
-	//res.send('NOT IMPLEMENTED: Project create POST');
 }
 
 // Handle Project delete on POST.
 exports.project_delete_post = function(req, res) {
-	Project.findById(req.params.id, function(err, data) {
-		var params = {
-			Bucket: S3_BUCKET,
-			Delete: {
-				Objects: []
-			}
+	Project.findById(req.params.id, function(err, project) {
+		if (err) {
+			return res.status(500).send(err)
+		}
+		if (!project) {
+			return res.status(404).send(false)
 		}
 
-		// console.log(data)
+		deleteLocalProjectImages(project.images, function(err) {
+			if (err) {
+				return res.status(500).send(err)
+			}
 
-		data.images.forEach(image => {
-			params.Delete.Objects.push({ Key: image.split('/').slice(-1)[0] })
-		})
-
-		s3.deleteObjects(params, function(err, data) {
-			// console.log(data)
-
-			if (err) return res.status(500).send(error)
 			Project.findByIdAndRemove(req.params.id, function(err) {
-				if (err) return res.status(500).send(error)
+				if (err) {
+					return res.status(500).send(err)
+				}
+
 				return res.send(true)
 			})
 		})
 	})
-
-	// res.send('NOT IMPLEMENTED: Project delete POST');
 }
 
 // Handle Project update on POST.
 exports.project_update_post = function(req, res) {
-	// Create a Book object with escaped and trimmed data.
-	var project = new Project(req.body)
+	var project = Object.assign({}, req.body)
 
-	Project.findByIdAndUpdate(req.params.id, project, {}, function(err) {
+	delete project._id
+	delete project.__v
+
+	if (!Array.isArray(project.images)) {
+		project.images = []
+	}
+
+	Project.findByIdAndUpdate(req.params.id, project, { new: true }, function(err, updatedProject) {
 		if (err) {
-			throw err
+			return res.status(500).send(err)
 		}
-		//successful - redirect to new book record.
-		// res.redirect('/dashboard/projects')
-		res.send(project)
+
+		res.send(updatedProject || project)
 	})
-
-	// var storage = multer.diskStorage({
-	//     destination: './www/catalog/project',
-	//     filename: function (req, file, cb) {
-
-	//         cb(null, req.params.id + '.' + mime.getExtension(file.mimetype));
-	//     }
-	// });
-
-	// var upload = multer({
-	//     storage: storage
-	// }).any();
-
-	// upload(req, res, function (err) {
-	//     if (err) {
-	//         throw err;
-	//         //return res.end('Error uploading file.');
-	//     } else {
-	//         //console.log(req.body);
-	//         //console.log(req.files);
-
-	//         project.name = req.body.project_name;
-	//         project.owner = req.body.project_owner;
-	//         project.description = req.body.project_description;
-	//         project.date = req.body.project_date;
-	//         project.cost = req.body.project_cost;
-	//         project.url = req.body.project_url;
-	//         project._id = req.params.id;
-	//         project.categories = req.body.project_categories;
-	//         project.imagetype = mime.getExtension(req.files[0].mimetype);
-	//         //console.log(product);
-
-	//         Project.findByIdAndUpdate(req.params.id, project, {}, function (err) {
-	//             if (err) {
-	//                 throw err;
-	//             }
-	//             //successful - redirect to new book record.
-	//             res.redirect('/dashboard/projects');
-	//         });
-
-	//         //res.end("File has been uploaded");
-	//     }
-	// });
-
-	//res.send('NOT IMPLEMENTED: Project update POST');
 }
 
-// Display detail image for a specific Enquiry.
+// Display the first image for a specific Project.
 exports.project_image_get = function(req, res) {
 	Project.findById(req.params.id).exec(function(err, project) {
 		if (err) {
-			throw err
-		}
-
-		res.contentType(project.image.contentType)
-		res.send(project.image.data)
-
-		//res.send(list_products);
-	})
-	// res.send('NOT IMPLEMENTED: Enquiry detail: ' + req.params.id);
-}
-
-exports.project_sign_s3_put_get = (req, res) => {
-	const fileName = req.query.fileName
-	const fileType = req.query.fileType
-
-	const s3Params = {
-		Bucket: S3_BUCKET,
-		Key: fileName,
-		Expires: 60,
-		ContentType: fileType,
-		ACL: 'public-read'
-	}
-
-	s3.getSignedUrl('putObject', s3Params, (err, data) => {
-		if (err) {
-			console.error(err)
 			return res.status(500).send(err)
 		}
-		const returnData = {
-			signedRequest: data,
-			url: `https://${S3_BUCKET}.s3.amazonaws.com/${fileName}`
+		if (!project || !project.images || !project.images[0]) {
+			return res.redirect('/images/blank.png')
 		}
-		res.send(JSON.stringify(returnData))
+
+		res.redirect(project.images[0])
 	})
 }
 
-exports.project_s3_delete_get = (req, res) => {
-	const filenameToRemove = req.query.fileName
-
-	const s3Params = {
-		Bucket: S3_BUCKET,
-		Key: filenameToRemove
-	}
-
-	s3.deleteObject(s3Params, function(err, data) {
+exports.project_image_upload_post = function(req, res) {
+	projectImageUpload(req, res, function(err) {
 		if (err) {
-			console.error(err)
 			return res.status(500).send(err)
 		}
+		if (!req.file) {
+			return res.status(400).send({
+				error: 'No image uploaded'
+			})
+		}
+
+		var url = PROJECT_IMAGE_URL_PREFIX + '/' + req.file.filename
+
+		res.send({
+			filename: req.file.filename,
+			url: url
+		})
+	})
+}
+
+exports.project_image_delete_get = function(req, res) {
+	var imagePath = localImagePathFromName(req.query.fileName)
+
+	if (!imagePath) {
+		return res.send(false)
+	}
+
+	fs.unlink(imagePath, function(err) {
+		if (err && err.code !== 'ENOENT') {
+			return res.status(500).send(err)
+		}
+
 		res.send(true)
 	})
 }
