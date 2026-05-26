@@ -78,95 +78,84 @@ const projectImageUpload = multer({
 }).single('project_image')
 
 // Display list of all Projects.
-exports.project_list = function(req, res) {
-	Project.find({}).exec(function(err, list_projects) {
-		if (err) {
-			return res.render('gallery', {
-				projects: []
-			})
-		}
-
-		res.render('gallery', {
-			projects: list_projects
-		})
-	})
+exports.project_list = async function(req, res) {
+	try {
+		var list_projects = await Project.find({})
+		res.render('gallery', { projects: list_projects })
+	} catch (err) {
+		res.render('gallery', { projects: [] })
+	}
 }
 
 exports.project_edit = function(req, res) {
 	res.render('edit-projects')
 }
 
-exports.project_list_api = function(req, res) {
-	Project.find({}).exec(function(err, list_projects) {
-		if (err) {
-			return res.status(500).send(err)
-		}
-
+exports.project_list_api = async function(req, res) {
+	try {
+		var list_projects = await Project.find({})
 		res.send(list_projects)
-	})
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Display detail page for a specific Project.
-exports.project_detail = function(req, res) {
-	Project.findById(req.params.id).exec(function(err, project) {
-		if (err) {
-			return res.status(500).send(err)
-		}
+exports.project_detail = async function(req, res) {
+	try {
+		var project = await Project.findById(req.params.id)
 		if (!project) {
-			return res.status(404).send({
-				error: 'Project not found'
-			})
+			return res.status(404).send({ error: 'Project not found' })
 		}
-
 		res.send(project)
-	})
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Handle Project create on POST.
-exports.project_create_post = function(req, res) {
+exports.project_create_post = async function(req, res) {
 	var project = new Project(req.body)
 
 	if (!project.images) {
 		project.images = []
 	}
 
-	project.save(function(err) {
-		if (err) {
-			return res.status(500).send(err)
-		}
-
+	try {
+		await project.save()
 		res.send(project)
-	})
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Handle Project delete on POST.
-exports.project_delete_post = function(req, res) {
-	Project.findById(req.params.id, function(err, project) {
-		if (err) {
-			return res.status(500).send(err)
-		}
+exports.project_delete_post = async function(req, res) {
+	try {
+		var project = await Project.findById(req.params.id)
 		if (!project) {
 			return res.status(404).send(false)
 		}
 
-		deleteLocalProjectImages(project.images, function(err) {
+		deleteLocalProjectImages(project.images, async function(err) {
 			if (err) {
 				return res.status(500).send(err)
 			}
 
-			Project.findByIdAndRemove(req.params.id, function(err) {
-				if (err) {
-					return res.status(500).send(err)
-				}
-
-				return res.send(true)
-			})
+			try {
+				await Project.findByIdAndDelete(req.params.id)
+				res.send(true)
+			} catch (e) {
+				res.status(500).send(e)
+			}
 		})
-	})
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Handle Project update on POST.
-exports.project_update_post = function(req, res) {
+exports.project_update_post = async function(req, res) {
 	var project = Object.assign({}, req.body)
 
 	delete project._id
@@ -176,27 +165,25 @@ exports.project_update_post = function(req, res) {
 		project.images = []
 	}
 
-	Project.findByIdAndUpdate(req.params.id, project, { new: true }, function(err, updatedProject) {
-		if (err) {
-			return res.status(500).send(err)
-		}
-
+	try {
+		var updatedProject = await Project.findByIdAndUpdate(req.params.id, project, { new: true })
 		res.send(updatedProject || project)
-	})
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Display the first image for a specific Project.
-exports.project_image_get = function(req, res) {
-	Project.findById(req.params.id).exec(function(err, project) {
-		if (err) {
-			return res.status(500).send(err)
-		}
+exports.project_image_get = async function(req, res) {
+	try {
+		var project = await Project.findById(req.params.id)
 		if (!project || !project.images || !project.images[0]) {
 			return res.redirect('/images/blank.png')
 		}
-
 		res.redirect(project.images[0])
-	})
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 exports.project_image_upload_post = function(req, res) {

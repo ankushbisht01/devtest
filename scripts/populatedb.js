@@ -22,8 +22,7 @@ var Enquiry = require('../models/enquiry')
 
 var mongoose = require("mongoose");
 var mongoDB = userArgs[0];
-mongoose.connect(mongoDB, { useNewUrlParser: true, useUnifiedTopology: true });
-mongoose.Promise = global.Promise;
+mongoose.connect(mongoDB);
 var db = mongoose.connection;
 mongoose.connection.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
@@ -70,15 +69,15 @@ function productCreate(name, description, cost, status, categories, imageFile, c
 
     var product = new Product(productdetail);
 
-    product.save(function (err) {
-        if (err) {
+    product.save()
+        .then(function () {
+            console.log('New product: ' + product);
+            products.push(product)
+            cb(null, product)
+        })
+        .catch(function (err) {
             cb(err, null)
-            return
-        }
-        console.log('New product: ' + product);
-        products.push(product)
-        cb(null, product)
-    });
+        });
 }
 
 function productCategoryCreate(name, cb) {
@@ -86,15 +85,15 @@ function productCategoryCreate(name, cb) {
         name: name
     });
 
-    productCategory.save(function (err) {
-        if (err) {
+    productCategory.save()
+        .then(function () {
+            console.log('New productCategory: ' + productCategory);
+            productCategories.push(productCategory)
+            cb(null, productCategory);
+        })
+        .catch(function (err) {
             cb(err, null);
-            return;
-        }
-        console.log('New productCategory: ' + productCategory);
-        productCategories.push(productCategory)
-        cb(null, productCategory);
-    });
+        });
 }
 
 function projectCreate(name, owner, description, date, cost, url, categories, images, cb) {
@@ -112,15 +111,15 @@ function projectCreate(name, owner, description, date, cost, url, categories, im
     }
 
     var project = new Project(projectdetail);
-    project.save(function (err) {
-        if (err) {
+    project.save()
+        .then(function () {
+            console.log('New project: ' + project);
+            projects.push(project)
+            cb(null, project)
+        })
+        .catch(function (err) {
             cb(err, null)
-            return
-        }
-        console.log('New project: ' + project);
-        projects.push(project)
-        cb(null, project)
-    });
+        });
 }
 
 
@@ -136,15 +135,15 @@ function enquiryCreate(name, comment, email, status, phone, date, cb) {
 
 
     var enquiry = new Enquiry(enquirydetail);
-    enquiry.save(function (err) {
-        if (err) {
+    enquiry.save()
+        .then(function () {
+            console.log('New enquiry: ' + enquiry);
+            enquiries.push(enquiry)
+            cb(null, enquiry)
+        })
+        .catch(function (err) {
             cb(err, null)
-            return
-        }
-        console.log('New enquiry: ' + enquiry);
-        enquiries.push(enquiry)
-        cb(null, enquiry)
-    });
+        });
 }
 
 

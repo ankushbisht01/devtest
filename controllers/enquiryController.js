@@ -3,87 +3,54 @@ var Product = require('../models/product')
 var mailer = require('../utils/dummyMailer')
 
 // Display list of all Enquirys.
-exports.enquiry_list = function(req, res) {
-	Enquiry.find({}, '_id comment status', {
-		sort: {
-			date: -1 //Sort by Date Added DESC
-		}
-	}).exec(function(err, list_all) {
-		if (err) {
-			return res.render('dashboard', {
-				enquiries: []
-			})
-		}
-		//Successful, so render
-		res.render('dashboard', {
-			enquiries: list_all
+exports.enquiry_list = async function(req, res) {
+	try {
+		var list_all = await Enquiry.find({}, '_id comment status', {
+			sort: { date: -1 }
 		})
-		//res.send(list_products);
-	})
-	//res.send('NOT IMPLEMENTED: Enquiry list');
+		res.render('dashboard', { enquiries: list_all })
+	} catch (err) {
+		res.render('dashboard', { enquiries: [] })
+	}
 }
 
 // Display list of all Enquirys.
-exports.dashboard_list = function(req, res) {
-	Enquiry.find(
-		{
-			status: true
-		},
-		'_id comment status',
-		{
-			sort: {
-				date: -1 //Sort by Date Added DESC
-			}
-		}
-	).exec(function(err, list_unread) {
-		if (err) {
-			return res.render('dashboard', {
-				enquiries: []
-			})
-		}
-		//Successful, so render
-		res.render('dashboard', {
-			enquiries: list_unread
-		})
-		//res.send(list_products);
-	})
+exports.dashboard_list = async function(req, res) {
+	try {
+		var list_unread = await Enquiry.find(
+			{ status: true },
+			'_id comment status',
+			{ sort: { date: -1 } }
+		)
+		res.render('dashboard', { enquiries: list_unread })
+	} catch (err) {
+		res.render('dashboard', { enquiries: [] })
+	}
 }
 
 // Display detail page for a specific Enquiry.
-exports.enquiry_detail = function(req, res) {
-	Enquiry.findById(req.params.id).exec(function(err, enquiry) {
-		if (err) {
-			return res.status(500).send(err)
-		}
+exports.enquiry_detail = async function(req, res) {
+	try {
+		var enquiry = await Enquiry.findById(req.params.id)
 		if (!enquiry) {
-			return res.status(404).send({
-				error: 'Enquiry not found'
-			})
+			return res.status(404).send({ error: 'Enquiry not found' })
 		}
-		//Successful, so render
-		//console.log(product)
 		res.send(enquiry)
-		//res.send(list_products);
 		enquiry.status = false
-		Enquiry.findByIdAndUpdate(req.params.id, enquiry, {}, function(err) {
-			if (err) {
-				return
-			}
-			//Successful, so render
-			//console.log(product)
-			//res.send(enquiry);
-			//res.send(list_products);
-		})
-	})
-	// res.send('NOT IMPLEMENTED: Enquiry detail: ' + req.params.id);
+		try {
+			await Enquiry.findByIdAndUpdate(req.params.id, enquiry, {})
+		} catch (_) {
+			// non-fatal: response already sent
+		}
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Handle Enquiry create on POST.
-exports.enquiry_create_post = function(req, res) {
-	Product.findById(req.body.productid).exec(function(err, pro) {
-		if (err) {
-			return res.status(500).send(err)
-		}
+exports.enquiry_create_post = async function(req, res) {
+	try {
+		var pro = await Product.findById(req.body.productid)
 
 		var enquiry = new Enquiry({
 			name: req.body.name,
@@ -96,37 +63,28 @@ exports.enquiry_create_post = function(req, res) {
 			enquiry.comment = 'About: ' + pro.name
 		}
 
-        let email = {
-            to: 'sparc.ideas@gmail.com',
-            from: `SpArc Enquiry <sparc@root-kings.com>`, //
-            subject: `Enquiry: ${enquiry.comment} `,
-            html: `<p>Body: ${enquiry.comment}. \
+		let email = {
+			to: 'sparc.ideas@gmail.com',
+			from: `SpArc Enquiry <sparc@root-kings.com>`,
+			subject: `Enquiry: ${enquiry.comment} `,
+			html: `<p>Body: ${enquiry.comment}. \
                         <br> \
                         <br>From: ${enquiry.name}  \
                         <br>Email: ${enquiry.email} \
                         <br>Phone: ${enquiry.phone} </p>`
-        }
+		}
 
-        mailer.send(email)
+		mailer.send(email)
 
-		enquiry.save(function(err) {
-			if (err) {
-				return res.status(500).send(err)
-			}
-			//successful - redirect to new book record.
-			res.send(pro || enquiry)
-
-			
-		})
-
-		//res.send('NOT IMPLEMENTED: Enquiry create POST');
-	})
+		await enquiry.save()
+		res.send(pro || enquiry)
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Handle Enquiry create on POST.
-exports.enquiry_contact_create_post = function(req, res) {
-	//console.log(req.body);
-
+exports.enquiry_contact_create_post = async function(req, res) {
 	var enquiry = new Enquiry({
 		name: req.body.name,
 		comment: req.body.comment,
@@ -134,39 +92,33 @@ exports.enquiry_contact_create_post = function(req, res) {
 		phone: req.body.phone
 	})
 
-	//console.log(enquiry);
-    let email = {
-        to: 'sparc.ideas@gmail.com',
-        from: `SpArc Enquiry <sparc@root-kings.com>`, //
-        subject: `Enquiry: ${enquiry.comment} `,
-        html: `<p>Body: ${enquiry.comment}. \
+	let email = {
+		to: 'sparc.ideas@gmail.com',
+		from: `SpArc Enquiry <sparc@root-kings.com>`,
+		subject: `Enquiry: ${enquiry.comment} `,
+		html: `<p>Body: ${enquiry.comment}. \
                     <br> \
                     <br>From: ${enquiry.name}  \
                     <br>Email: ${enquiry.email} \
                     <br>Phone: ${enquiry.phone} </p>`
-    }
+	}
 
-    mailer.send(email)
-	//res.send('NOT IMPLEMENTED: Enquiry create POST');
+	mailer.send(email)
 
-	enquiry.save(function(err) {
-		if (err) {
-			return res.status(500).send(err)
-		}
-
-		res.render('contact', {
-			status: true
-		})
-	})
+	try {
+		await enquiry.save()
+		res.render('contact', { status: true })
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }
 
 // Display Enquiry delete form on GET.
-exports.enquiry_delete_get = function(req, res) {
-	Enquiry.findByIdAndRemove(req.params.id, function(err) {
-		if (err) {
-			return res.status(500).send(err)
-		}
-		// Success - go to author list
+exports.enquiry_delete_get = async function(req, res) {
+	try {
+		await Enquiry.findByIdAndDelete(req.params.id)
 		res.send(true)
-	})
+	} catch (err) {
+		res.status(500).send(err)
+	}
 }

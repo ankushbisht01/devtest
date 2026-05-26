@@ -20,12 +20,9 @@ var routes = require('./routes.js')
 
 //Import the mongoose module
 var mongoose = require('mongoose')
-mongoose.set('useFindAndModify', false)
 
 //Set up default mongoose connection
-mongoose.connect(dbport, { useNewUrlParser: true, useUnifiedTopology: true })
-// Get Mongoose to use the global promise library
-mongoose.Promise = global.Promise
+mongoose.connect(dbport , { useNewUrlParser: true, useUnifiedTopology: true })
 //Get the default connection
 var db = mongoose.connection
 
